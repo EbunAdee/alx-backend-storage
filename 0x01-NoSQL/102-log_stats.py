@@ -1,39 +1,32 @@
 #!/usr/bin/env python3
-"""Print info in a collection"""
+"""
+A script that provides some stats about Nginx logs stored in MongoDB
+"""
 from pymongo import MongoClient
 
-if __name__ == "__main__":
-    """ Make a check for all elements in a collention """
+
+def log_stat() -> None:
+    """
+    Provides some stats about Nginx logs stored in MongoDB
+    """
+    stats = ""
     client = MongoClient('mongodb://127.0.0.1:27017')
-    collection = client.logs.nginx
-
-    print(f"{collection.estimated_document_count()} logs")
-
-    print("Methods:")
-    for method in ["GET", "POST", "PUT", "PATCH", "DELETE"]:
-        method_count = collection.count_documents({'method': method})
-        print(f"\tmethod {method}: {method_count}")
-
-    check_get = collection.count_documents({
-        'method': 'GET', 'path': "/status"
-    })
-    print(f"{check_get} status check")
-
-    print("IPs:")
-    top_ips = collection.aggregate([
-        {"$group":
-            {
-                "_id": "$ip",
-                "count": {"$sum": 1}
-            }
-        },
-        {"$sort": {"count": -1}},
-        {"$limit": 10},
-        {"$project": {
-            "_id": 0,
-            "ip": "$_id",
-            "count": 1
-        }}
-    ])
+    nginx_collection = client.logs.nginx
+    method = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+    stats += "{} logs\nMethods:\n".format(nginx_collection.count_documents({}))
+    for m in method:
+        method_count = nginx_collection.count_documents({"method": m})
+        stats += '\tmethod {}: {}\n'.format(m, method_count)
+    stats += "{} status check".format(
+        nginx_collection.count_documents({"path": "/status"}))
+    stats += '\nIPs:\n'
+    top_ips = nginx_collection.aggregate([
+        {'$group': {'_id': '$ip', 'count': {'$sum': 1}}},
+        {'$sort': {'count': -1}}, {'$limit': 10}])
     for ip in top_ips:
-        print(f"\t{ip.get('ip')}: {ip.get('count')}")
+        stats += '\t{}: {}\n'.format(ip.get('_id'), ip.get('count'))
+    print(stats, end='')
+
+
+if __name__ == '__main__':
+    log_stat()
